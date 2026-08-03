@@ -5,7 +5,7 @@ Minimal RAG that includes : PDF loader → chunking → embeddings → Chroma �
 
 ```bash
 pip install -r requirements.txt
-export ANTHROPIC_API_KEY="ta_clé_api"
+
 ```
 
 ## Utilisation
