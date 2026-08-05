@@ -1,6 +1,10 @@
 # Environnement virtuel
 venv/
 
+# Variables d'environnement
+.env
+.env.local
+.env.*.local
 
 # Base vectorielle Chroma (générée localement, pas besoin de versionner)
 chroma_db/
