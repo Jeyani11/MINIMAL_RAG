@@ -15,6 +15,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_classic.chains.retrieval import create_retrieval_chain
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_classic.retrievers.contextual_compression import ContextualCompressionRetriever
+from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+
 # from langchain.evaluation.qa import QAEvalChain
 
 #=======================DOCUMENT LOADING===================
@@ -68,12 +72,23 @@ retriever = db.as_retriever(
 )
     
 
-# Retrieve documents
-query = "What does RAG stand for ?"
-retrieved_docs = retriever.invoke(query)
-print(f"Retrived {len(retrieved_docs)} documents")
 
 #=========================== RERANKER =========================
+
+cross_encoder = HuggingFaceCrossEncoder(model_name = "cross-encoder/ms-marco-MiniLM-L6-v2")
+reranker = CrossEncoderReranker(model=cross_encoder, top_n= 5)
+
+compression_retriever = ContextualCompressionRetriever(
+    base_compressor = reranker,
+    base_retriever = retriever,
+)
+
+# Retrieve documents
+query = "How is Wikipedia used for RAG in a wide range of knowledge-intensive tasks ?"
+retrieved_compressed_docs = compression_retriever.invoke(query)
+for i, doc in enumerate(retrieved_compressed_docs, 1):
+    print(f"Document {i}:\n{doc.page_content}\n")
+
 
 """
 print("\n--- RETRIEVED CHUNKS ---")
@@ -136,7 +151,7 @@ documents_chain = create_stuff_documents_chain(
     )
 
 rag_chain = create_retrieval_chain(
-    retriever=retriever,
+    retriever= compression_retriever,
     combine_docs_chain=documents_chain,
     
 )
