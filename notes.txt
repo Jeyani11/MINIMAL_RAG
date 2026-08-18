@@ -1,0 +1,11 @@
+For the question "What does RAG stand for ?", the answer is "Retrieval-Augmented Generation".
+I had a hard time finding the answer instead of just i don't know, 
+the problem resided in the fact that the RAG could't find the correct chunk containing the definition of RAG.
+First, because the chunk size was too small, 
+and second because the retriever was not returning enough chunks. 
+I increased the chunk size to 1000 words and the number of chunks returned by the retriever to 45 instead of 10, 
+which allowed me to find the correct chunk containing the definition of RAG. 
+And the problem mainly resided by the fact that the research was based on the similarity of the chunks and not keyword search, 
+and the chunk containing the definition of RAG was not similar enough to the question "What does RAG stand for ?".
+
+'all-mpnet-base-v2' is a good model for general use, but it is not optimized for matching explicit acronyms vs. paraphrases.

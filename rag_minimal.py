@@ -1,9 +1,11 @@
+# Retriever similarity ? MMR ? How does it work
+
 import os
 import sys
-import glob # What does all this import used for ?
+import glob # Lister fichiers avec pattern
 import re
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma 
@@ -17,8 +19,11 @@ from langchain_core.prompts import ChatPromptTemplate
 
 #=======================DOCUMENT LOADING===================
 
-loader = PyPDFLoader("CORPUS/paper.pdf")
-documents = loader.load()
+loader = glob.glob("CORPUS/*.pdf")
+documents = []
+for path in loader:
+    doc = PyPDFLoader(path)
+    documents.extend(doc.load())
 print(f"Loaded {len(documents)} documents")
 
 def preprocess_text(text):
@@ -27,7 +32,7 @@ def preprocess_text(text):
     # Remove page numbers
     text = re.sub(r'Page \d+', '', text)
     # Remove special characters
-    text = re.sub(r'[^\w\s\.\,\!\?]', '', text)
+    #text = re.sub(r'[^\w\s\.\,\!\?]', '', text)
     return text.strip()
 
 # Apply to documents
@@ -36,8 +41,8 @@ for doc in documents:
 
 #=========================== CHUNKING =============================
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=300, # Max characters per chunk
-    chunk_overlap=50 # Overlap between chunks
+    chunk_size=1000, # Max characters per chunk
+    chunk_overlap=300 # Overlap between chunks
 )
 docs = text_splitter.split_documents(documents)
 print(f"Split into {len(docs)} chunks")
@@ -58,8 +63,8 @@ print("Vector store created")
 
 # Create a retriever
 retriever = db.as_retriever(
-    search_type =  "similarity",
-    search_kwargs = {"k":5} # Return top 5 chunks 
+    search_type =  "similarity", # Maximum Marginal Relevance for diversity
+    search_kwargs = {"k":45} # Return top 5 chunks 
 )
     
 
@@ -68,15 +73,39 @@ query = "What does RAG stand for ?"
 retrieved_docs = retriever.invoke(query)
 print(f"Retrived {len(retrieved_docs)} documents")
 
+#=========================== RERANKER =========================
+
+"""
+print("\n--- RETRIEVED CHUNKS ---")
+# Cherche le chunk contenant la définition, indépendamment du retriever
+for i, doc in enumerate(docs):
+    if "retrieval-augmented generation" in doc.page_content.lower():
+        print(f"Chunk index {i}: {doc.page_content[:400]}")
+
+all_scored = db.similarity_search_with_score(query, k=len(docs))  # score sur TOUS les chunks
+for rank, (doc, score) in enumerate(all_scored):
+    if "retrieval-augmented generation" in doc.page_content.lower():
+        print(f"Rang réel du bon chunk : {rank} (score={score})")
+        break
+
+# Verifie si le chunk contient "Retrieval-Augmented"
+for i, doc in enumerate(retrieved_docs):
+    if "Retrieval-Augmented" in doc.page_content or "RAG" in doc.page_content:
+        print(f"✓ Chunk {i+1} contains RAG related content!")
+        print(f"Full content: {doc.page_content}")
+"""
 #================================ GENERATION ==================================
 
 # Récupère la clé
+load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Vérification optionnelle (à retirer en production)
 if not GOOGLE_API_KEY:
     raise ValueError("GOOGLE_API_KEY not found in .env file")
-
+else:
+    print("GOOGLE_API_KEY found in .env file")
+    print(f"GOOGLE_API_KEY: {GOOGLE_API_KEY[:4]}...{GOOGLE_API_KEY[-4:]}")  # Affiche les 4 premiers et derniers caractères
 #Initialize LLM
 
 llm = ChatGoogleGenerativeAI(
@@ -93,6 +122,8 @@ prompt_template = ChatPromptTemplate.from_template(
     Answer the question based only on the following context. 
     If the context does not contain the answer, say "I don't know".
     Always be concise.
+
+    Important: If the question asks for an acronym, look for the full form
     
     Context: {context}
     Question: {input}
